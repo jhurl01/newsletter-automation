@@ -1,0 +1,13 @@
+name,url,event_type_focus,update_frequency,fetch_method
+GoToLouisville Blog,https://www.gotolouisville.com/blog/top-events-happening-in-louisville-this-[month]/,general curated,monthly,direct_fetch
+Louisville Downtown,https://louisvilledowntown.org/all-events/,downtown events,continuous,direct_fetch
+LouToday 6AM City,https://loutoday.6amcity.com/events,local news events,continuous,direct_fetch_partial
+Eventbrite Louisville,https://www.eventbrite.com/d/ky--louisville/events/,all categories,continuous,web_search
+SeatGeek Louisville,https://seatgeek.com/louisville-ky-tickets,concerts/sports,continuous,web_search
+Songkick Louisville,https://www.songkick.com/metro-areas/28788-us-louisville,music,continuous,web_search
+Nextdoor Louisville,https://nextdoor.com/events/,community/neighborhood,continuous,login_required
+Facebook Events Louisville,https://www.facebook.com/events/,all categories,continuous,login_required
+Louisville KY Gov,https://louisvilleky.gov/news-events,city events,continuous,sparse
+Louisville MiLB Bats,https://www.milb.com/louisville,sports,continuous,direct_fetch
+Kentucky Derby Festival,https://kdf.org/events/,festivals,seasonal,direct_fetch
+LEO Weekly,https://leoweekly.com/events/,arts/culture/music,continuous,direct_fetch
