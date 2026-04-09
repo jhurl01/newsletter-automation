@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
+import Groq from 'groq-sdk';
 import type { NewsletterEvent, FormattingOptions } from '@/lib/types';
 
+// Uses Groq (free) when GROQ_API_KEY is set, otherwise falls back to Anthropic.
+const GROQ_MODEL = 'llama-3.3-70b-versatile';
+const ANTHROPIC_MODEL = 'claude-haiku-4-5-20251001';
+
 function stripEmDashes(text: string): string {
-  // Replace em dash (U+2014) with a comma, cleaning up surrounding whitespace
   return text
     .replace(/\s*\u2014\s*/g, ', ')
     .replace(/\u2014/g, ', ')
@@ -12,7 +16,7 @@ function stripEmDashes(text: string): string {
 
 const TONE_DESCRIPTIONS: Record<FormattingOptions['tone'], string> = {
   casual:
-    'Write like you are texting a Louisville friend about something cool to do this week. Use "you" and "y\'all." Contractions are fine. Show local pride without being over the top.',
+    "Write like you are texting a Louisville friend about something cool to do this week. Use \"you\" and \"y'all.\" Contractions are fine. Show local pride without being over the top.",
   energetic:
     'High energy. Get the reader hyped about showing up. Short punchy sentences. Exclamations are okay if they are earned. Make it feel like something worth leaving the house for.',
   dry:
@@ -22,10 +26,11 @@ const TONE_DESCRIPTIONS: Record<FormattingOptions['tone'], string> = {
 const LENGTH_DESCRIPTIONS: Record<FormattingOptions['descLength'], string> = {
   brief: '2 sentences maximum. Be tight.',
   standard: '2 to 3 sentences.',
-  detailed: '3 to 4 sentences. Add context or a detail that makes the event feel worth attending.',
+  detailed:
+    '3 to 4 sentences. Add context or a detail that makes the event feel worth attending.',
 };
 
-function buildFormatPrompt(options: FormattingOptions): string {
+function buildSystemPrompt(options: FormattingOptions): string {
   const custom = options.customInstructions.trim();
   return `You are writing newsletter content for the LouPlug Louisville events newsletter.
 
@@ -76,6 +81,37 @@ event_url: ${ev.event_url}
 source_site: ${ev.source_site}`;
 }
 
+async function formatWithGroq(
+  systemPrompt: string,
+  userMessage: string
+): Promise<string> {
+  const client = new Groq({ apiKey: process.env.GROQ_API_KEY });
+  const completion = await client.chat.completions.create({
+    model: GROQ_MODEL,
+    max_tokens: 2048,
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userMessage },
+    ],
+  });
+  return completion.choices[0]?.message?.content ?? '';
+}
+
+async function formatWithAnthropic(
+  systemPrompt: string,
+  userMessage: string
+): Promise<string> {
+  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const response = await client.messages.create({
+    model: ANTHROPIC_MODEL,
+    max_tokens: 2048,
+    system: systemPrompt,
+    messages: [{ role: 'user', content: userMessage }],
+  });
+  const block = response.content.find((b) => b.type === 'text');
+  return block?.type === 'text' ? block.text : '';
+}
+
 export async function POST(req: NextRequest) {
   const { events, options, startDate, endDate } = (await req.json()) as {
     events: NewsletterEvent[];
@@ -88,30 +124,30 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Exactly 3 events required' }, { status: 400 });
   }
 
-  if (!process.env.ANTHROPIC_API_KEY) {
-    return NextResponse.json({ error: 'ANTHROPIC_API_KEY not set' }, { status: 500 });
+  const hasGroq = !!process.env.GROQ_API_KEY;
+  const hasAnthropic = !!process.env.ANTHROPIC_API_KEY;
+
+  if (!hasGroq && !hasAnthropic) {
+    return NextResponse.json(
+      { error: 'Set GROQ_API_KEY (free) or ANTHROPIC_API_KEY in .env.local' },
+      { status: 500 }
+    );
   }
 
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
+  const systemPrompt = buildSystemPrompt(options);
   const userMessage = [
     `Format these 3 events for the LouPlug newsletter covering ${startDate} through ${endDate}.\n`,
     ...events.map((ev, i) => eventToText(ev, i)),
   ].join('\n\n');
 
   try {
-    const response = await client.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 2048,
-      system: buildFormatPrompt(options),
-      messages: [{ role: 'user', content: userMessage }],
-    });
+    const raw = hasGroq
+      ? await formatWithGroq(systemPrompt, userMessage)
+      : await formatWithAnthropic(systemPrompt, userMessage);
 
-    const textBlock = response.content.find((b) => b.type === 'text');
-    const raw = textBlock?.type === 'text' ? textBlock.text : '';
     const markdown = stripEmDashes(raw.trim());
-
-    return NextResponse.json({ markdown });
+    const provider = hasGroq ? 'groq' : 'anthropic';
+    return NextResponse.json({ markdown, provider });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     return NextResponse.json({ error: msg }, { status: 500 });

@@ -235,7 +235,7 @@ export async function POST(req: NextRequest) {
           iterations++;
 
           const response = await client.messages.create({
-            model: 'claude-sonnet-4-6',
+            model: process.env.ANTHROPIC_MODEL ?? 'claude-haiku-4-5-20251001',
             max_tokens: 8192,
             system: systemPrompt,
             tools: TOOL_DEFS,
