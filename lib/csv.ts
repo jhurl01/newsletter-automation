@@ -22,6 +22,17 @@ export function generateCsv(events: NewsletterEvent[]): string {
   return Papa.unparse({ fields: COLUMNS, data: rows });
 }
 
+export function getMdFilename(startDate: string, endDate: string): string {
+  const fmt = (d: string) => {
+    const date = new Date(d + 'T12:00:00');
+    const month = date.toLocaleString('en-US', { month: 'short' });
+    const day = date.getDate();
+    return `${month}${day}`;
+  };
+  const year = new Date(startDate + 'T12:00:00').getFullYear();
+  return `LouPlug_Newsletter_${fmt(startDate)}_${fmt(endDate)}_${year}.md`;
+}
+
 export function getCsvFilename(startDate: string, endDate: string): string {
   const fmt = (d: string) => {
     const date = new Date(d + 'T12:00:00');

@@ -28,3 +28,9 @@ export interface LogEntry {
   message: string;
   timestamp: string;
 }
+
+export interface FormattingOptions {
+  tone: 'casual' | 'energetic' | 'dry';
+  descLength: 'brief' | 'standard' | 'detailed';
+  customInstructions: string;
+}
